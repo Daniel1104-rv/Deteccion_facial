@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MediaPipe + OpenCV.js (Estable)</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- OpenCV.js -->
+  <script defer src="https://docs.opencv.org/4.x/opencv.js"></script>
+
+  <!-- MediaPipe FaceMesh -->
+  <script defer src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+  <!-- App -->
+  <script defer src="app.js"></script>
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-dark bg-dark">
+    <div class="container">
+      <span class="navbar-brand">MediaPipe + OpenCV.js</span>
+      <div class="d-flex gap-2">
+        <select id="selRes" class="form-select form-select-sm w-auto">
+          <option value="640x480" selected>640×480</option>
+          <option value="1280x720">1280×720</option>
+        </select>
+        <button id="btnStart" class="btn btn-success btn-sm">Encender cámara</button>
+        <button id="btnStop" class="btn btn-outline-danger btn-sm" disabled>Apagar cámara</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container py-4">
+    <div class="row g-4">
+      <div class="col-12 col-lg-7">
+        <div class="card shadow-sm">
+          <div class="card-header">Vista</div>
+          <div class="card-body">
+            <div class="view-wrap">
+              <!-- Mostramos el video real; el overlay va encima -->
+              <video id="video" playsinline muted></video>
+              <canvas id="overlay"></canvas>
+            </div>
+            <div id="status" class="small text-muted pt-2">Estado: listo</div>
+            <div id="calibAlert" class="alert alert-info mt-3 d-none">Calibrando (2s)… rostro centrado y neutral.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-lg-5">
+        <div class="card shadow-sm mb-4">
+          <div class="card-header">Controles rápidos</div>
+          <div class="card-body small">
+            <div class="mb-3">
+              <label class="form-label mb-1">Sensibilidad parpadeo</label>
+              <input id="sBlink" type="range" min="70" max="95" value="80" class="form-range">
+              <div class="text-muted">Cierre = EARbase × <span id="lblBlink">0.80</span> · Apertura = +0.10</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label mb-1">Sensibilidad cejas</label>
+              <input id="sBrow" type="range" min="110" max="150" value="130" class="form-range">
+              <div class="text-muted">Umbral = Base × <span id="lblBrow">1.30</span></div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label mb-1">Sensibilidad boca</label>
+              <input id="sMouth" type="range" min="130" max="190" value="160" class="form-range">
+              <div class="text-muted">Umbral = Base × <span id="lblMouth">1.60</span></div>
+            </div>
+            <ul class="mb-0">
+              <li>Ejecuta en <strong>https</strong> o <strong>localhost</strong>.</li>
+              <li>Buena luz frontal evita falsos positivos.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card shadow-sm">
+          <div class="card-header">Contadores</div>
+          <div class="card-body">
+            <div class="row text-center">
+              <div class="col-4"><div class="badge text-bg-dark fs-6 w-100 py-3"><div class="small">PARPADEOS</div><div id="blinkCount" class="fs-4">0</div></div></div>
+              <div class="col-4"><div class="badge text-bg-dark fs-6 w-100 py-3"><div class="small">CEJAS ↑</div><div id="browCount" class="fs-4">0</div></div></div>
+              <div class="col-4"><div class="badge text-bg-dark fs-6 w-100 py-3"><div class="small">BOCA ↑</div><div id="mouthCount" class="fs-4">0</div></div></div>
+            </div>
+            <hr>
+            <pre id="log" class="mb-0 small" style="max-height:200px; overflow:auto;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="bg-dark text-light py-3">
+    <div class="container d-flex flex-wrap align-items-center justify-content-between">
+      <span class="small">© 2025 | Programador: <strong>Daniel Rodriguez Del Valle</strong></span>
+      <span class="small">HTML · Bootstrap · JavaScript · MediaPipe · OpenCV.js</span>
+    </div>
+  </footer>
+
+  <script defer src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
