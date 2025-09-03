@@ -5,6 +5,7 @@ const octx = overlay.getContext('2d');
 
 const btnStart = document.getElementById('btnStart');
 const btnStop  = document.getElementById('btnStop');
+const btnReset = document.getElementById('btnReset'); // <-- NUEVO
 const selRes   = document.getElementById('selRes');
 
 const sBlink = document.getElementById('sBlink');
@@ -24,8 +25,31 @@ const mouthCountEl = document.getElementById('mouthCount');
 
 function log(s){ const t=new Date().toLocaleTimeString(); logEl.textContent = `[${t}] ${s}\n`+logEl.textContent; }
 function setStatus(s){ statusEl.textContent = `Estado: ${s}`; }
-function updLabels(){ lblBlink.textContent=(sBlink.value/100).toFixed(2); lblBrow.textContent=(sBrow.value/100).toFixed(2); lblMouth.textContent=(sMouth.value/100).toFixed(2); }
-[sBlink,sBrow,sMouth].forEach(e=>e.addEventListener('input',updLabels)); updLabels();
+function updLabels(){ if(!sBlink||!sBrow||!sMouth) return; lblBlink.textContent=(sBlink.value/100).toFixed(2); lblBrow.textContent=(sBrow.value/100).toFixed(2); lblMouth.textContent=(sMouth.value/100).toFixed(2); }
+if (sBlink && sBrow && sMouth) { [sBlink,sBrow,sMouth].forEach(e=>e.addEventListener('input',updLabels)); updLabels(); }
+
+// ====== API (MockAPI) ======
+const API_URL = 'https://68b89987b71540504328ab01.mockapi.io/api/v1/gestos';
+async function saveGesture(counters){
+  const payload = {
+    parpadeo: counters.parpadeo|0,
+    cejas: counters.cejas|0,
+    boca: counters.boca|0,
+    fecha_hora: new Date().toISOString()
+  };
+  try{
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if(!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    const data = await res.json();
+    log(`Guardado en API (id ${data.id}) → P:${payload.parpadeo} C:${payload.cejas} B:${payload.boca}`);
+  }catch(err){
+    log(`ERROR API: ${err.message}`);
+  }
+}
 
 // ====== Estado general ======
 let stream=null, running=false, rafSend=null, faceMesh=null;
@@ -58,6 +82,7 @@ let mouthState = 'CLOSED';       // CLOSED | OPEN
 let mouthOpenedAt = 0;
 let mouthClosedAt = 0;
 let lastMouthAt = 0;
+let mouthCloseFrames = 0;
 const MOUTH_OPEN_MIN_MS = 300;
 const MOUTH_CLOSE_MIN_MS = 250;
 const MOUTH_REFRACT_MS = 280;
@@ -164,7 +189,6 @@ function onResults(r){
 
   // ROIs OpenCV
   if (gray){
-    // Ojos: oscuridad media (si es alta, refuerza “cierre” y penaliza cejas/boca)
     const eyeRectL = roiFromLandmarksRect(lmk, lmk[LEFT.EYE[0]],  lmk[LEFT.EYE[3]], 0.6, W, H);
     const eyeRectR = roiFromLandmarksRect(lmk, lmk[RIGHT.EYE[3]], lmk[RIGHT.EYE[0]], 0.6, W, H);
     const eyeL = gray.roi(eyeRectL), eyeR = gray.roi(eyeRectR);
@@ -172,7 +196,6 @@ function onResults(r){
     if (eyeDark > 0.40) { browDist *= 0.98; }
     if (eyeDark > 0.55) { mouthOpen *= 0.98; }
 
-    // Cejas: densidad de bordes
     const browRectL = roiFromLandmarksRect(lmk, lmk[LEFT.BROW_TOP],  lmk[LEFT.IRIS],  1.2, W, H);
     const browRectR = roiFromLandmarksRect(lmk, lmk[RIGHT.BROW_TOP], lmk[RIGHT.IRIS], 1.2, W, H);
     const browLROI = gray.roi(browRectL), browRROI = gray.roi(browRectR);
@@ -180,7 +203,6 @@ function onResults(r){
     browDist *= (1 + Math.min(0.08, browEdge*0.4));
     browLROI.delete(); browRROI.delete();
 
-    // Boca: oscuridad interna
     const mouthRect = roiFromLandmarksRect(lmk, lmk[MOUTH_UP], lmk[MOUTH_LO], 1.6, W, H);
     const mouthROI = gray.roi(mouthRect);
     const mouthDark = darkRatio(mouthROI);
@@ -196,67 +218,65 @@ function onResults(r){
   if (calibrating){ calibSamples.push({ ear:earAvg, brow:browDist, mouth:mouthOpen }); return; }
 
   // ====== UMBRALES ======
-  const kClose = sBlink.value/100;                 // p.ej. 0.80
-  const kOpen  = Math.min(kClose + 0.10, 0.97);    // histéresis
+  const kClose = sBlink ? (sBlink.value/100) : 0.80;
+  const kOpen  = Math.min(kClose + 0.10, 0.97);
   const thClose= calib.earBase * kClose;
   const thOpen = calib.earBase * kOpen;
 
-  const kBrow  = sBrow.value/100;                  // p.ej. 1.30
+  const kBrow  = sBrow ? (sBrow.value/100) : 1.30;
   const thBrow = calib.browBase * kBrow;
 
-  const kMouth = sMouth.value/100;                 // p.ej. 1.60
+  const kMouth = sMouth ? (sMouth.value/100) : 1.60;
   const thMouth= calib.mouthBase * kMouth;
 
   const t = now();
 
-  // ====== Parpadeo (solo si duración dentro del rango) ======
+  // ====== Parpadeo ======
   if (eyeState === 'OPEN' && earAvg < thClose) {
-    // cerrar
     if (t - eyeOpenedAt >= EYE_MIN_OPEN_MS) { eyeState = 'CLOSED'; eyeClosedAt = t; }
   } else if (eyeState === 'CLOSED' && earAvg > thOpen) {
     const dur = t - eyeClosedAt;
     if (dur >= BLINK_MIN_MS && dur <= BLINK_MAX_MS && (t - lastBlinkAt) > BLINK_REFRACT_MS) {
       blinkCount++; blinkCountEl.textContent = String(blinkCount);
       lastBlinkAt = t; log(`Parpadeo (${Math.round(dur)} ms)`);
+      saveGesture({ parpadeo: blinkCount, cejas: browCount, boca: mouthCount });
     }
     eyeState = 'OPEN'; eyeOpenedAt = t;
-    // limpiar contadores auxiliares
   }
 
-  // ====== Cejas (pico con caída y hold) ======
+  // ====== Cejas ======
   if (!browAbove && browDist > thBrow) {
     browAbove = true; browStartAt = t; browPeak = browDist;
   }
   if (browAbove) {
     browPeak = Math.max(browPeak, browDist);
-    const dropped = browDist < thBrow * 0.92; // exige caída
+    const dropped = browDist < thBrow * 0.92;
     const held = (t - browStartAt) >= BROW_MIN_HOLD_MS;
     if (dropped && held && (t - lastBrowAt) > BROW_REFRACT_MS) {
       browCount++; browCountEl.textContent = String(browCount);
       lastBrowAt = t; log('Cejas ↑');
       browAbove = false; browPeak = 0;
+      saveGesture({ parpadeo: blinkCount, cejas: browCount, boca: mouthCount });
     }
-    if (dropped && !held) { browAbove = false; browPeak = 0; } // cancelar falsos picos breves
+    if (dropped && !held) { browAbove = false; browPeak = 0; }
   }
 
-  // ====== Boca (open ≥300ms -> close ≥250ms) ======
+  // ====== Boca ======
   if (mouthState === 'CLOSED' && mouthOpen > thMouth) {
     mouthState = 'OPEN'; mouthOpenedAt = t; mouthCloseFrames = 0;
   } else if (mouthState === 'OPEN') {
     if (mouthOpen > thMouth) {
       // sigue abierta
     } else {
-      // empezó a cerrar
       if (t - mouthOpenedAt >= MOUTH_OPEN_MIN_MS) {
-        // cuenta solo cuando además sostiene el cierre mínimo
         if (!mouthClosedAt) mouthClosedAt = t;
         if ((t - mouthClosedAt) >= MOUTH_CLOSE_MIN_MS && (t - lastMouthAt) > MOUTH_REFRACT_MS) {
           mouthCount++; mouthCountEl.textContent = String(mouthCount);
           lastMouthAt = t; log('Boca ↑');
           mouthState = 'CLOSED'; mouthClosedAt = 0;
+          saveGesture({ parpadeo: blinkCount, cejas: browCount, boca: mouthCount });
         }
       } else {
-        // fue un “amago” corto → cancelar
         mouthState = 'CLOSED'; mouthClosedAt = 0;
       }
     }
@@ -267,13 +287,7 @@ function onResults(r){
 async function startCamera(){
   if (running) return;
 
-  // reset UI
-  blinkCount=browCount=mouthCount=0;
-  blinkCountEl.textContent=browCountEl.textContent=mouthCountEl.textContent='0';
-  eyeState='OPEN'; eyeOpenedAt=now();
-  mouthState='CLOSED'; mouthClosedAt=now();
-  browAbove=false; browPeak=0;
-
+  resetCounters(false); // reset sin log redundante
   setStatus('solicitando permisos…');
   try{
     const [w,h] = selRes.value.split('x').map(Number);
@@ -292,18 +306,17 @@ async function startCamera(){
   await video.play();
   overlay.width = video.videoWidth; overlay.height = video.videoHeight;
 
-  // start libs
   try{ if(!faceMesh) setupFaceMesh(); }catch(e){ setStatus('error de procesamiento'); log('ERROR MediaPipe: '+e.message); return; }
   startCalibration();
 
   running=true; btnStart.disabled=true; btnStop.disabled=false; setStatus('en ejecución'); log('Cámara encendida');
 
-  // bucle de envío a MediaPipe
   const send = async () => { if (!running) return; try { await faceMesh.send({ image: video }); } catch(_){ } rafSend = requestAnimationFrame(send); };
   send();
 }
 
-function stopCamera(){
+async function stopCamera(){
+  try { await saveGesture({ parpadeo: blinkCount, cejas: browCount, boca: mouthCount }); } catch(_) {}
   if(!running && !stream) return;
   try{ cancelAnimationFrame(rafSend); }catch(_){}
   try{ if(stream) stream.getTracks().forEach(t=>t.stop()); }catch(_){}
@@ -320,7 +333,22 @@ function stopCamera(){
   setStatus('detenido'); log('Cámara apagada y recursos liberados');
 }
 
+// ====== Reset contadores (NUEVO) ======
+function resetCounters(withLog = true){
+  // contadores
+  blinkCount = 0; browCount = 0; mouthCount = 0;
+  blinkCountEl.textContent = browCountEl.textContent = mouthCountEl.textContent = '0';
+  // estados y temporizadores
+  eyeState='OPEN'; eyeOpenedAt = now(); eyeClosedAt = 0; lastBlinkAt = 0;
+  mouthState='CLOSED'; mouthOpenedAt = 0; mouthClosedAt = now(); lastMouthAt = 0;
+  browAbove=false; browPeak=0; browStartAt=0; lastBrowAt=0;
+  // suavizados
+  ema.ear = null; ema.brow = null; ema.mouth = null;
+  if (withLog) log('Contadores reiniciados');
+}
+
 // eventos
 btnStart.addEventListener('click', startCamera);
 btnStop.addEventListener('click', stopCamera);
+btnReset.addEventListener('click', () => resetCounters(true)); // <-- NUEVO
 window.addEventListener('beforeunload', stopCamera);
