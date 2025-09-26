@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90" viewBox="0 0 160 90">
+  <defs>
+    <radialGradient id="irisGrad" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#4fc3f7"/>
+      <stop offset="70%" stop-color="#0288d1"/>
+      <stop offset="100%" stop-color="#01579b"/>
+    </radialGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="1.2" stdDeviation="1.5" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <rect width="100%" height="100%" rx="12" ry="12" fill="#fff"/>
+  <!-- Left eye -->
+  <g filter="url(#shadow)">
+    <ellipse cx="55" cy="45" rx="38" ry="20" fill="#fff" stroke="#222" stroke-width="3"/>
+    <circle cx="55" cy="45" r="9" fill="url(#irisGrad)" stroke="#0b3954" stroke-width="2"/>
+    <circle cx="58" cy="42" r="3.2" fill="#fff" opacity="0.9"/>
+    <path d="M20 45 Q55 25 90 45" fill="none" stroke="#222" stroke-width="2.3" opacity="0.08"/>
+  </g>
+  <!-- Right eye -->
+  <g filter="url(#shadow)">
+    <ellipse cx="120" cy="45" rx="38" ry="20" fill="#fff" stroke="#222" stroke-width="3"/>
+    <circle cx="120" cy="45" r="9" fill="url(#irisGrad)" stroke="#0b3954" stroke-width="2"/>
+    <circle cx="123" cy="42" r="3.2" fill="#fff" opacity="0.9"/>
+    <path d="M85 45 Q120 25 155 45" fill="none" stroke="#222" stroke-width="2.3" opacity="0.08"/>
+  </g>
+  <!-- subtle eyelids highlight -->
+  <path d="M17 38 Q55 18 93 38" fill="none" stroke="#999" stroke-opacity="0.35" stroke-width="1.5"/>
+  <path d="M82 38 Q120 18 158 38" fill="none" stroke="#999" stroke-opacity="0.35" stroke-width="1.5"/>
+</svg>

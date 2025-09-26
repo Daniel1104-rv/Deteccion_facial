@@ -29,7 +29,6 @@
         </select>
         <button id="btnStart" class="btn btn-success btn-sm">Encender cámara</button>
         <button id="btnStop" class="btn btn-outline-danger btn-sm" disabled>Apagar cámara</button>
-        <!-- NUEVO: botón Reset -->
         <button id="btnReset" class="btn btn-warning btn-sm">Reset</button>
       </div>
     </div>
@@ -42,7 +41,6 @@
           <div class="card-header">Vista</div>
           <div class="card-body">
             <div class="view-wrap">
-              <!-- Mostramos el video real; el overlay va encima -->
               <video id="video" playsinline muted></video>
               <canvas id="overlay"></canvas>
             </div>
@@ -53,7 +51,83 @@
       </div>
 
       <div class="col-12 col-lg-5">
-        <div class="card shadow-sm mb-4">
+        <!-- ===== Último estado (en vivo) — ARRIBA ===== -->
+        <div class="card shadow-sm">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Último estado (en vivo)</span>
+            <div class="d-flex gap-2">
+              <span id="liveDot" class="badge rounded-pill text-bg-secondary">OFF</span>
+              <button id="btnRefreshLatest" class="btn btn-outline-primary btn-sm">Actualizar</button>
+            </div>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0" id="tblLatest">
+                <thead class="table-dark">
+                  <tr>
+                    <th style="width:160px">Gesto</th>
+                    <th>Último estado</th>
+                    <th style="width:180px">Fecha/Hora</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="fw-semibold">👀 Ojos</td>
+                    <td>
+                      <span id="lastOjosState" class="badge text-bg-secondary">—</span>
+                      <div class="thumb-wrap mt-2">
+                        <img id="lastOjosImg" class="status-thumb d-none" alt="Ojos estado">
+                      </div>
+                    </td>
+                    <td><span id="lastOjosTime" class="text-muted">—</span></td>
+                  </tr>
+                  <tr>
+                    <td class="fw-semibold">🪄 Cejas</td>
+                    <td>
+                      <span id="lastCejasState" class="badge text-bg-secondary">—</span>
+                      <div class="thumb-wrap mt-2">
+                        <img id="lastCejasImg" class="status-thumb d-none" alt="Cejas estado">
+                      </div>
+                    </td>
+                    <td><span id="lastCejasTime" class="text-muted">—</span></td>
+                  </tr>
+                  <tr>
+                    <td class="fw-semibold">😮 Boca</td>
+                    <td>
+                      <span id="lastBocaState" class="badge text-bg-secondary">—</span>
+                      <div class="thumb-wrap mt-2">
+                        <img id="lastBocaImg" class="status-thumb d-none" alt="Boca estado">
+                      </div>
+                    </td>
+                    <td><span id="lastBocaTime" class="text-muted">—</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card-footer small text-muted">
+            Se actualiza automáticamente cada 1 s.
+          </div>
+        </div>
+        <!-- ===== /Último estado (en vivo) ===== -->
+
+        <!-- ===== Contadores — EN MEDIO ===== -->
+        <div class="card shadow-sm mt-4">
+          <div class="card-header">Contadores</div>
+          <div class="card-body">
+            <div class="row text-center">
+              <div class="col-4"><div class="badge text-bg-dark fs-6 w-100 py-3"><div class="small">PARPADEOS</div><div id="blinkCount" class="fs-4">0</div></div></div>
+              <div class="col-4"><div class="badge text-bg-dark fs-6 w-100 py-3"><div class="small">CEJAS ↑</div><div id="browCount" class="fs-4">0</div></div></div>
+              <div class="col-4"><div class="badge text-bg-dark fs-6 w-100 py-3"><div class="small">BOCA ↑</div><div id="mouthCount" class="fs-4">0</div></div></div>
+            </div>
+            <hr>
+            <pre id="log" class="mb-0 small" style="max-height:200px; overflow:auto;"></pre>
+          </div>
+        </div>
+        <!-- ===== /Contadores ===== -->
+
+        <!-- ===== Controles rápidos — ABAJO ===== -->
+        <div class="card shadow-sm mt-4">
           <div class="card-header">Controles rápidos</div>
           <div class="card-body small">
             <div class="mb-3">
@@ -77,19 +151,7 @@
             </ul>
           </div>
         </div>
-
-        <div class="card shadow-sm">
-          <div class="card-header">Contadores</div>
-          <div class="card-body">
-            <div class="row text-center">
-              <div class="col-4"><div class="badge text-bg-dark fs-6 w-100 py-3"><div class="small">PARPADEOS</div><div id="blinkCount" class="fs-4">0</div></div></div>
-              <div class="col-4"><div class="badge text-bg-dark fs-6 w-100 py-3"><div class="small">CEJAS ↑</div><div id="browCount" class="fs-4">0</div></div></div>
-              <div class="col-4"><div class="badge text-bg-dark fs-6 w-100 py-3"><div class="small">BOCA ↑</div><div id="mouthCount" class="fs-4">0</div></div></div>
-            </div>
-            <hr>
-            <pre id="log" class="mb-0 small" style="max-height:200px; overflow:auto;"></pre>
-          </div>
-        </div>
+        <!-- ===== /Controles rápidos ===== -->
       </div>
     </div>
   </main>

@@ -17,3 +17,26 @@
 }
 #log{ background:#111; color:#c7f; border-radius:.5rem; padding:.75rem; }
 .badge.fs-6{ min-width:88px; }
+.status-thumb{
+  height: 36px;       /* tamaño pequeño */
+  width: auto;
+  display: block;
+  object-fit: contain;
+}
+.thumb-wrap{
+  min-height: 38px;   /* que no brinque la tabla cuando cambia */
+}
+/* Tabla “Último estado” */
+#tblLatest td .badge {
+  font-size: 0.95rem;
+  padding: 0.5rem 0.65rem;
+  letter-spacing: .3px;
+}
+#tblLatest tbody tr:hover {
+  background: rgba(0,0,0,0.03);
+}
+
+/* Indicador LIVE */
+#liveDot.text-bg-success {
+  box-shadow: 0 0 0 .25rem rgba(25,135,84,.15);
+}

@@ -5,7 +5,7 @@ const octx = overlay.getContext('2d');
 
 const btnStart = document.getElementById('btnStart');
 const btnStop  = document.getElementById('btnStop');
-const btnReset = document.getElementById('btnReset'); // <-- NUEVO
+const btnReset = document.getElementById('btnReset'); // botón Reset
 const selRes   = document.getElementById('selRes');
 
 const sBlink = document.getElementById('sBlink');
@@ -28,27 +28,43 @@ function setStatus(s){ statusEl.textContent = `Estado: ${s}`; }
 function updLabels(){ if(!sBlink||!sBrow||!sMouth) return; lblBlink.textContent=(sBlink.value/100).toFixed(2); lblBrow.textContent=(sBrow.value/100).toFixed(2); lblMouth.textContent=(sMouth.value/100).toFixed(2); }
 if (sBlink && sBrow && sMouth) { [sBlink,sBrow,sMouth].forEach(e=>e.addEventListener('input',updLabels)); updLabels(); }
 
-// ====== API (MockAPI) ======
-const API_URL = 'https://68b89987b71540504328ab01.mockapi.io/api/v1/gestos';
-async function saveGesture(counters){
-  const payload = {
-    parpadeo: counters.parpadeo|0,
-    cejas: counters.cejas|0,
-    boca: counters.boca|0,
-    fecha_hora: new Date().toISOString()
-  };
+// ====== API (FastAPI local -> MySQL) ======
+const API_BASE = "http://127.0.0.1:8010";
+
+async function saveOjos(estado){
   try{
-    const res = await fetch(API_URL, {
+    const res = await fetch(`${API_BASE}/ojos`, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ estado })
     });
     if(!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-    const data = await res.json();
-    log(`Guardado en API (id ${data.id}) → P:${payload.parpadeo} C:${payload.cejas} B:${payload.boca}`);
-  }catch(err){
-    log(`ERROR API: ${err.message}`);
-  }
+    log(`API ojos OK: ${estado}`);
+  }catch(err){ log(`ERROR API ojos: ${err.message}`); }
+}
+
+async function saveCejas(estado){
+  try{
+    const res = await fetch(`${API_BASE}/cejas`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ estado })
+    });
+    if(!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    log(`API cejas OK: ${estado}`);
+  }catch(err){ log(`ERROR API cejas: ${err.message}`); }
+}
+
+async function saveBoca(estado){
+  try{
+    const res = await fetch(`${API_BASE}/boca`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ estado })
+    });
+    if(!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    log(`API boca OK: ${estado}`);
+  }catch(err){ log(`ERROR API boca: ${err.message}`); }
 }
 
 // ====== Estado general ======
@@ -67,32 +83,34 @@ const EMA_A = 0.35; // alpha
 // tiempos y estados
 const now = () => performance.now();
 
-// ---- Parpadeo (state machine) ----
+// ---- Parpadeo (state machine + anti-rebote) ----
 let eyeState = 'OPEN';           // OPEN | CLOSED
 let eyeClosedAt = 0;
 let eyeOpenedAt = 0;
 let lastBlinkAt = 0;
+let eyePendingClosedPost = false; // para postear CERRADO solo si el cierre es válido
 const BLINK_MIN_MS = 80;
 const BLINK_MAX_MS = 300;
 const BLINK_REFRACT_MS = 250;
 const EYE_MIN_OPEN_MS = 140;
 
-// ---- Boca (state machine) ----
+// ---- Boca (state machine + anti-rebote) ----
 let mouthState = 'CLOSED';       // CLOSED | OPEN
 let mouthOpenedAt = 0;
 let mouthClosedAt = 0;
 let lastMouthAt = 0;
-let mouthCloseFrames = 0;
-const MOUTH_OPEN_MIN_MS = 300;
+let mouthPendingOpenPost = false; // postear ABIERTA solo si se valida
+const MOUTH_OPEN_MIN_MS = 350;   // robusto
 const MOUTH_CLOSE_MIN_MS = 250;
-const MOUTH_REFRACT_MS = 280;
+const MOUTH_REFRACT_MS = 300;
 
-// ---- Cejas (peak detection) ----
+// ---- Cejas (state machine + anti-rebote) ----
 let browAbove = false;
 let browStartAt = 0;
 let browPeak = 0;
 let lastBrowAt = 0;
-const BROW_MIN_HOLD_MS = 120;
+let browPendingUpPost = false;   // postear ARRIBA solo si se valida
+const BROW_MIN_HOLD_MS = 140;
 const BROW_REFRACT_MS = 380;
 
 // calibración
@@ -151,8 +169,20 @@ function roiFromLandmarksRect(lmk, a, b, pad, W, H){
   const rw=Math.min(W-rx, w*W)|0, rh=Math.min(H-ry, h*H)|0;
   return new cv.Rect(rx, ry, Math.max(2,rw), Math.max(2,rh));
 }
-function darkRatio(mat){ const bin=new cv.Mat(); cv.threshold(mat,bin,0,255,cv.THRESH_BINARY_INV+cv.THRESH_OTSU); const d=cv.countNonZero(bin)/(bin.rows*bin.cols); bin.delete(); return d; }
-function edgeDensity(mat){ const ed=new cv.Mat(); cv.Canny(mat,ed,60,120); const d=cv.countNonZero(ed)/(ed.rows*ed.cols); ed.delete(); return d; }
+function darkRatio(mat){
+  const bin=new cv.Mat();
+  cv.threshold(mat,bin,0,255,cv.THRESH_BINARY_INV+cv.THRESH_OTSU);
+  const d=cv.countNonZero(bin)/(bin.rows*bin.cols);
+  bin.delete();
+  return d;
+}
+function edgeDensity(mat){
+  const ed = new cv.Mat();
+  cv.Canny(mat, ed, 60, 120);
+  const d = cv.countNonZero(ed) / (ed.rows * ed.cols);
+  ed.delete();
+  return d;
+}
 
 // ====== EMA ======
 function smooth(key, val){
@@ -187,27 +217,34 @@ function onResults(r){
   let browDist = (browL + browR)/2;
   let mouthOpen = d2(lmk[MOUTH_UP], lmk[MOUTH_LO]) / faceW;
 
-  // ROIs OpenCV
+  // ROIs OpenCV (opcionales, protegidas con try/catch)
   if (gray){
-    const eyeRectL = roiFromLandmarksRect(lmk, lmk[LEFT.EYE[0]],  lmk[LEFT.EYE[3]], 0.6, W, H);
-    const eyeRectR = roiFromLandmarksRect(lmk, lmk[RIGHT.EYE[3]], lmk[RIGHT.EYE[0]], 0.6, W, H);
-    const eyeL = gray.roi(eyeRectL), eyeR = gray.roi(eyeRectR);
-    const eyeDark = (darkRatio(eyeL) + darkRatio(eyeR))/2; eyeL.delete(); eyeR.delete();
-    if (eyeDark > 0.40) { browDist *= 0.98; }
-    if (eyeDark > 0.55) { mouthOpen *= 0.98; }
+    try{
+      // Ojos: oscuridad media
+      const eyeRectL = roiFromLandmarksRect(lmk, lmk[LEFT.EYE[0]],  lmk[LEFT.EYE[3]], 0.6, W, H);
+      const eyeRectR = roiFromLandmarksRect(lmk, lmk[RIGHT.EYE[3]], lmk[RIGHT.EYE[0]], 0.6, W, H);
+      const eyeL = gray.roi(eyeRectL), eyeR = gray.roi(eyeRectR);
+      const eyeDark = (darkRatio(eyeL) + darkRatio(eyeR))/2; eyeL.delete(); eyeR.delete();
+      if (eyeDark > 0.40) { browDist *= 0.98; }
+      if (eyeDark > 0.55) { mouthOpen *= 0.98; }
 
-    const browRectL = roiFromLandmarksRect(lmk, lmk[LEFT.BROW_TOP],  lmk[LEFT.IRIS],  1.2, W, H);
-    const browRectR = roiFromLandmarksRect(lmk, lmk[RIGHT.BROW_TOP], lmk[RIGHT.IRIS], 1.2, W, H);
-    const browLROI = gray.roi(browRectL), browRROI = gray.roi(browRectR);
-    const browEdge = (edgeDensity(browLROI) + edgeDensity(browRROI))/2;
-    browDist *= (1 + Math.min(0.08, browEdge*0.4));
-    browLROI.delete(); browRROI.delete();
+      // Cejas: densidad de bordes
+      const browRectL = roiFromLandmarksRect(lmk, lmk[LEFT.BROW_TOP],  lmk[LEFT.IRIS],  1.2, W, H);
+      const browRectR = roiFromLandmarksRect(lmk, lmk[RIGHT.BROW_TOP], lmk[RIGHT.IRIS], 1.2, W, H);
+      const browLROI = gray.roi(browRectL), browRROI = gray.roi(browRectR);
+      const browEdge = (edgeDensity(browLROI) + edgeDensity(browRROI))/2;
+      browDist *= (1 + Math.min(0.08, browEdge*0.4));
+      browLROI.delete(); browRROI.delete();
 
-    const mouthRect = roiFromLandmarksRect(lmk, lmk[MOUTH_UP], lmk[MOUTH_LO], 1.6, W, H);
-    const mouthROI = gray.roi(mouthRect);
-    const mouthDark = darkRatio(mouthROI);
-    mouthOpen *= (1 + Math.min(0.18, mouthDark*0.55));
-    mouthROI.delete();
+      // Boca: oscuridad interna
+      const mouthRect = roiFromLandmarksRect(lmk, lmk[MOUTH_UP], lmk[MOUTH_LO], 1.6, W, H);
+      const mouthROI = gray.roi(mouthRect);
+      const mouthDark = darkRatio(mouthROI);
+      mouthOpen *= (1 + Math.min(0.18, mouthDark*0.55));
+      mouthROI.delete();
+    }catch(e){
+      log('OpenCV ROI error: ' + e.message);
+    }
   }
 
   // Suavizado EMA
@@ -217,67 +254,109 @@ function onResults(r){
 
   if (calibrating){ calibSamples.push({ ear:earAvg, brow:browDist, mouth:mouthOpen }); return; }
 
-  // ====== UMBRALES ======
+  // ====== UMBRALES (con histéresis) ======
+  // OJOS: cierre y apertura con separación
   const kClose = sBlink ? (sBlink.value/100) : 0.80;
   const kOpen  = Math.min(kClose + 0.10, 0.97);
   const thClose= calib.earBase * kClose;
   const thOpen = calib.earBase * kOpen;
 
+  // CEJAS
   const kBrow  = sBrow ? (sBrow.value/100) : 1.30;
   const thBrow = calib.browBase * kBrow;
 
+  // BOCA
   const kMouth = sMouth ? (sMouth.value/100) : 1.60;
-  const thMouth= calib.mouthBase * kMouth;
+  const thMouthOpen  = calib.mouthBase * kMouth; // abrir
+  const thMouthClose = thMouthOpen * 0.92;       // cerrar (histéresis)
 
   const t = now();
 
-  // ====== Parpadeo ======
+  // ====== OJOS (solo postear en parpadeo válido) ======
   if (eyeState === 'OPEN' && earAvg < thClose) {
-    if (t - eyeOpenedAt >= EYE_MIN_OPEN_MS) { eyeState = 'CLOSED'; eyeClosedAt = t; }
+    if (t - eyeOpenedAt >= EYE_MIN_OPEN_MS) {
+      eyeState = 'CLOSED';
+      eyeClosedAt = t;
+      eyePendingClosedPost = true; // aún no posteamos; verificamos duración
+    }
   } else if (eyeState === 'CLOSED' && earAvg > thOpen) {
     const dur = t - eyeClosedAt;
     if (dur >= BLINK_MIN_MS && dur <= BLINK_MAX_MS && (t - lastBlinkAt) > BLINK_REFRACT_MS) {
       blinkCount++; blinkCountEl.textContent = String(blinkCount);
       lastBlinkAt = t; log(`Parpadeo (${Math.round(dur)} ms)`);
-      saveGesture({ parpadeo: blinkCount, cejas: browCount, boca: mouthCount });
+      if (eyePendingClosedPost) { saveOjos('CERRADO'); eyePendingClosedPost = false; }
+      saveOjos('ABIERTO');
+    } else {
+      eyePendingClosedPost = false; // amago
     }
     eyeState = 'OPEN'; eyeOpenedAt = t;
   }
 
-  // ====== Cejas ======
+  // ====== CEJAS (solo postear cuando se valida y cuando baja) ======
   if (!browAbove && browDist > thBrow) {
-    browAbove = true; browStartAt = t; browPeak = browDist;
+    browAbove = true;
+    browStartAt = t;
+    browPeak = browDist;
+    browPendingUpPost = true; // post ARRIBA solo si sostiene
   }
   if (browAbove) {
     browPeak = Math.max(browPeak, browDist);
-    const dropped = browDist < thBrow * 0.92;
-    const held = (t - browStartAt) >= BROW_MIN_HOLD_MS;
-    if (dropped && held && (t - lastBrowAt) > BROW_REFRACT_MS) {
-      browCount++; browCountEl.textContent = String(browCount);
-      lastBrowAt = t; log('Cejas ↑');
-      browAbove = false; browPeak = 0;
-      saveGesture({ parpadeo: blinkCount, cejas: browCount, boca: mouthCount });
+
+    if (browPendingUpPost && (t - browStartAt) >= BROW_MIN_HOLD_MS) {
+      saveCejas('ARRIBA');
+      browPendingUpPost = false;
     }
-    if (dropped && !held) { browAbove = false; browPeak = 0; }
+
+    const dropped = browDist < thBrow * 0.92; // caída requerida
+    const refractOK = (t - lastBrowAt) > BROW_REFRACT_MS;
+
+    if (dropped) {
+      if ((t - browStartAt) >= BROW_MIN_HOLD_MS && refractOK) {
+        browCount++; browCountEl.textContent = String(browCount);
+        lastBrowAt = t; log('Cejas ↑');
+        saveCejas('ABAJO');     // solo cuando el evento fue válido
+      }
+      // cerrar ciclo (válido o amago)
+      browAbove = false; browPeak = 0; browPendingUpPost = false;
+    }
   }
 
-  // ====== Boca ======
-  if (mouthState === 'CLOSED' && mouthOpen > thMouth) {
-    mouthState = 'OPEN'; mouthOpenedAt = t; mouthCloseFrames = 0;
-  } else if (mouthState === 'OPEN') {
-    if (mouthOpen > thMouth) {
-      // sigue abierta
+  // ====== BOCA (solo postear cuando se valida y cuando cierra) ======
+  if (mouthState === 'CLOSED') {
+    if (mouthOpen > thMouthOpen) {
+      mouthState = 'OPEN';
+      mouthOpenedAt = t;
+      mouthClosedAt = 0;
+      mouthPendingOpenPost = true; // post ABIERTA solo si se valida
+    }
+  } else {
+    // OPEN
+    if (mouthOpen > thMouthOpen) {
+      if (mouthPendingOpenPost && (t - mouthOpenedAt) >= MOUTH_OPEN_MIN_MS) {
+        saveBoca('ABIERTA');  // apertura válida confirmada
+        mouthPendingOpenPost = false;
+      }
     } else {
-      if (t - mouthOpenedAt >= MOUTH_OPEN_MIN_MS) {
-        if (!mouthClosedAt) mouthClosedAt = t;
-        if ((t - mouthClosedAt) >= MOUTH_CLOSE_MIN_MS && (t - lastMouthAt) > MOUTH_REFRACT_MS) {
-          mouthCount++; mouthCountEl.textContent = String(mouthCount);
-          lastMouthAt = t; log('Boca ↑');
-          mouthState = 'CLOSED'; mouthClosedAt = 0;
-          saveGesture({ parpadeo: blinkCount, cejas: browCount, boca: mouthCount });
-        }
+      // empezó a cerrar
+      if ((t - mouthOpenedAt) < MOUTH_OPEN_MIN_MS) {
+        // amago: cancelar, no postear nada
+        mouthState = 'CLOSED';
+        mouthPendingOpenPost = false;
+        mouthClosedAt = 0;
       } else {
-        mouthState = 'CLOSED'; mouthClosedAt = 0;
+        if (!mouthClosedAt) mouthClosedAt = t;
+        if (mouthOpen < thMouthClose) {
+          const cierreOK = (t - mouthClosedAt) >= MOUTH_CLOSE_MIN_MS;
+          const refractOK = (t - lastMouthAt) > MOUTH_REFRACT_MS;
+          if (cierreOK && refractOK) {
+            mouthCount++; mouthCountEl.textContent = String(mouthCount);
+            lastMouthAt = t; log('Boca ↑');
+            saveBoca('CERRADA');   // solo cuando el evento es válido
+            mouthState = 'CLOSED';
+            mouthClosedAt = 0;
+            mouthPendingOpenPost = false;
+          }
+        }
       }
     }
   }
@@ -287,7 +366,8 @@ function onResults(r){
 async function startCamera(){
   if (running) return;
 
-  resetCounters(false); // reset sin log redundante
+  // reset UI
+  resetCounters(false);
   setStatus('solicitando permisos…');
   try{
     const [w,h] = selRes.value.split('x').map(Number);
@@ -304,7 +384,8 @@ async function startCamera(){
 
   video.srcObject=stream; video.muted=true; video.playsInline=true;
   await video.play();
-  overlay.width = video.videoWidth; overlay.height = video.videoHeight;
+  overlay.width  = video.videoWidth;
+  overlay.height = video.videoHeight;
 
   try{ if(!faceMesh) setupFaceMesh(); }catch(e){ setStatus('error de procesamiento'); log('ERROR MediaPipe: '+e.message); return; }
   startCalibration();
@@ -315,8 +396,7 @@ async function startCamera(){
   send();
 }
 
-async function stopCamera(){
-  try { await saveGesture({ parpadeo: blinkCount, cejas: browCount, boca: mouthCount }); } catch(_) {}
+function stopCamera(){
   if(!running && !stream) return;
   try{ cancelAnimationFrame(rafSend); }catch(_){}
   try{ if(stream) stream.getTracks().forEach(t=>t.stop()); }catch(_){}
@@ -333,22 +413,125 @@ async function stopCamera(){
   setStatus('detenido'); log('Cámara apagada y recursos liberados');
 }
 
-// ====== Reset contadores (NUEVO) ======
+// ====== Reset contadores ======
 function resetCounters(withLog = true){
-  // contadores
   blinkCount = 0; browCount = 0; mouthCount = 0;
   blinkCountEl.textContent = browCountEl.textContent = mouthCountEl.textContent = '0';
-  // estados y temporizadores
-  eyeState='OPEN'; eyeOpenedAt = now(); eyeClosedAt = 0; lastBlinkAt = 0;
-  mouthState='CLOSED'; mouthOpenedAt = 0; mouthClosedAt = now(); lastMouthAt = 0;
-  browAbove=false; browPeak=0; browStartAt=0; lastBrowAt=0;
-  // suavizados
+
+  // Ojos
+  eyeState='OPEN'; eyeOpenedAt = now(); eyeClosedAt = 0; lastBlinkAt = 0; eyePendingClosedPost = false;
+
+  // Boca
+  mouthState='CLOSED'; mouthOpenedAt = 0; mouthClosedAt = now(); lastMouthAt = 0; mouthPendingOpenPost = false;
+
+  // Cejas
+  browAbove=false; browPeak=0; browStartAt=0; lastBrowAt=0; browPendingUpPost = false;
+
+  // Suavizados
   ema.ear = null; ema.brow = null; ema.mouth = null;
+
   if (withLog) log('Contadores reiniciados');
 }
 
 // eventos
 btnStart.addEventListener('click', startCamera);
 btnStop.addEventListener('click', stopCamera);
-btnReset.addEventListener('click', () => resetCounters(true)); // <-- NUEVO
+btnReset.addEventListener('click', () => resetCounters(true));
 window.addEventListener('beforeunload', stopCamera);
+
+// ====== [AGREGADO] Último estado (tabla en vivo con imagen) ======
+const lastOjosState = document.getElementById('lastOjosState');
+const lastOjosTime  = document.getElementById('lastOjosTime');
+const lastCejasState= document.getElementById('lastCejasState');
+const lastCejasTime = document.getElementById('lastCejasTime');
+const lastBocaState = document.getElementById('lastBocaState');
+const lastBocaTime  = document.getElementById('lastBocaTime');
+
+const lastOjosImg   = document.getElementById('lastOjosImg');
+const lastCejasImg  = document.getElementById('lastCejasImg');
+const lastBocaImg   = document.getElementById('lastBocaImg');
+
+const btnRefreshLatest = document.getElementById('btnRefreshLatest');
+const liveDot = document.getElementById('liveDot');
+
+/* Mapa de imágenes/GIF (pon tus archivos en /assets o cambia las rutas) */
+const ICONS = {
+  OJOS: {
+    ABIERTO: "assets/ojos_abiertos.svg",
+    CERRADO: "assets/ojos_cerrados.svg",
+  },
+  CEJAS: {
+    ARRIBA:  "assets/cejas_arriba.svg",
+    ABAJO:   "assets/cejas_abajo.svg",
+  },
+  BOCA: {
+    ABIERTA: "assets/boca_abierta.svg",
+    CERRADA: "assets/boca_cerrada.svg",
+  }
+};
+
+function badgeClassByGesto(gesto, estado) {
+  const ok='text-bg-success', warn='text-bg-warning', bad='text-bg-danger', info='text-bg-info', sec='text-bg-secondary';
+  if (gesto === 'OJOS')  return estado === 'ABIERTO' ? ok : estado === 'CERRADO' ? bad : 'text-bg-secondary';
+  if (gesto === 'CEJAS') return estado === 'ARRIBA'  ? info : estado === 'ABAJO'  ? sec : 'text-bg-secondary';
+  if (gesto === 'BOCA')  return estado === 'ABIERTA' ? warn: estado === 'CERRADA'? sec : 'text-bg-secondary';
+  return 'text-bg-secondary';
+}
+function formatDateTime(dtStr){ try{ const d=new Date(dtStr); return isNaN(d)?'—':d.toLocaleString(); }catch{ return '—'; } }
+
+function putLatest(targetBadgeEl, targetTimeEl, targetImgEl, gesto, data) {
+  const ultimo = data?.ultimo || null;
+  const estado = ultimo?.estado || '—';
+  const fh = ultimo?.fecha_hora || '—';
+
+  // Badge + fecha
+  targetBadgeEl.textContent = estado;
+  targetBadgeEl.className = 'badge ' + badgeClassByGesto(gesto, estado);
+  targetTimeEl.textContent = ultimo ? formatDateTime(fh) : '—';
+
+  // Imagen según estado
+  const src = ICONS?.[gesto]?.[estado];
+  if (src) {
+    targetImgEl.src = src;
+    targetImgEl.classList.remove('d-none');
+  } else {
+    targetImgEl.classList.add('d-none');
+    targetImgEl.removeAttribute('src');
+  }
+}
+
+// Consulta los 3 endpoints en paralelo y actualiza la tabla
+async function refreshLatest() {
+  try {
+    liveDot.textContent = 'LIVE';
+    liveDot.className = 'badge rounded-pill text-bg-success';
+    const [boca, cejas, ojos] = await Promise.allSettled([
+      fetch(`${API_BASE}/ultimo/boca`).then(r => r.json()),
+      fetch(`${API_BASE}/ultimo/cejas`).then(r => r.json()),
+      fetch(`${API_BASE}/ultimo/ojos`).then(r => r.json()),
+    ]);
+
+    if (boca.status === 'fulfilled') {
+      putLatest(lastBocaState, lastBocaTime, lastBocaImg, 'BOCA', boca.value);
+    }
+    if (cejas.status === 'fulfilled') {
+      putLatest(lastCejasState, lastCejasTime, lastCejasImg, 'CEJAS', cejas.value);
+    }
+    if (ojos.status === 'fulfilled') {
+      putLatest(lastOjosState, lastOjosTime, lastOjosImg, 'OJOS', ojos.value);
+    }
+  } catch (e) {
+    liveDot.textContent = 'OFF';
+    liveDot.className = 'badge rounded-pill text-bg-secondary';
+  }
+}
+
+// Botón manual
+if (btnRefreshLatest) btnRefreshLatest.addEventListener('click', refreshLatest);
+
+// Polling automático cada 1 s
+setInterval(refreshLatest, 1000);
+
+// Disparo inicial al cargar
+refreshLatest();
+
