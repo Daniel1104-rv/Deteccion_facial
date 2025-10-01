@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>MediaPipe + OpenCV.js (Estable)</title>
+  <title>MediaPipe + OpenCV.js</title>
 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="styles.css" />
@@ -15,14 +15,21 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
-  <!-- App -->
+  <!-- Tu lógica completa (cámara, live status, etc.) -->
   <script defer src="app.js"></script>
 </head>
-<body class="bg-light">
-  <nav class="navbar navbar-dark bg-dark">
+<body class="bg-body">
+  <!-- NAV -->
+  <nav class="navbar navbar-dark navbar-expand bg-dark shadow-sm sticky-top">
     <div class="container">
-      <span class="navbar-brand">MediaPipe + OpenCV.js</span>
-      <div class="d-flex gap-2">
+      <a class="navbar-brand fw-semibold" href="index.html">MediaPipe + OpenCV.js</a>
+      <ul class="navbar-nav ms-3">
+        <li class="nav-item"><a class="nav-link active" href="index.html">En vivo</a></li>
+        <li class="nav-item"><a class="nav-link" href="ultimos5.html">Últimos 5 estatus</a></li>
+        <li class="nav-item"><a class="nav-link" href="resumen_fecha.html">Resumen por fecha</a></li>
+        <li class="nav-item"><a class="nav-link" href="controles.html">Controles rápidos</a></li>
+      </ul>
+      <div class="ms-auto d-flex gap-2">
         <select id="selRes" class="form-select form-select-sm w-auto">
           <option value="640x480" selected>640×480</option>
           <option value="1280x720">1280×720</option>
@@ -34,11 +41,13 @@
     </div>
   </nav>
 
+  <!-- CONTENIDO -->
   <main class="container py-4">
     <div class="row g-4">
-      <div class="col-12 col-lg-7">
-        <div class="card shadow-sm">
-          <div class="card-header">Vista</div>
+      <!-- Vista -->
+      <div class="col-12 col-xl-7">
+        <div class="card card-elev shadow-sm">
+          <div class="card-header bg-white fw-semibold">Vista</div>
           <div class="card-body">
             <div class="view-wrap">
               <video id="video" playsinline muted></video>
@@ -48,26 +57,54 @@
             <div id="calibAlert" class="alert alert-info mt-3 d-none">Calibrando (2s)… rostro centrado y neutral.</div>
           </div>
         </div>
+
+        <!-- Contadores (debajo de la cámara, limpios) -->
+        <div class="card card-elev shadow-sm mt-4">
+          <div class="card-header bg-white fw-semibold">Contadores</div>
+          <div class="card-body">
+            <div class="row text-center g-3">
+              <div class="col-4">
+                <div class="badge metric w-100">
+                  <div class="small">PARPADEOS</div>
+                  <div id="blinkCount" class="display-6 m-0">0</div>
+                </div>
+              </div>
+              <div class="col-4">
+                <div class="badge metric w-100">
+                  <div class="small">CEJAS ↑</div>
+                  <div id="browCount" class="display-6 m-0">0</div>
+                </div>
+              </div>
+              <div class="col-4">
+                <div class="badge metric w-100">
+                  <div class="small">BOCA ↑</div>
+                  <div id="mouthCount" class="display-6 m-0">0</div>
+                </div>
+              </div>
+            </div>
+            <!-- (YA SIN LOG AQUÍ) -->
+          </div>
+        </div>
       </div>
 
-      <div class="col-12 col-lg-5">
-        <!-- ===== Último estado (en vivo) — ARRIBA ===== -->
-        <div class="card shadow-sm">
-          <div class="card-header d-flex justify-content-between align-items-center">
-            <span>Último estado (en vivo)</span>
+      <!-- Último estado en vivo -->
+      <div class="col-12 col-xl-5">
+        <div class="card card-elev shadow-sm">
+          <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <span class="fw-semibold">Último estado (en vivo)</span>
             <div class="d-flex gap-2">
               <span id="liveDot" class="badge rounded-pill text-bg-secondary">OFF</span>
               <button id="btnRefreshLatest" class="btn btn-outline-primary btn-sm">Actualizar</button>
             </div>
           </div>
           <div class="card-body p-0">
-            <div class="table-responsive">
-              <table class="table table-hover align-middle mb-0" id="tblLatest">
+            <div class="table-responsive" id="latestWrap">
+              <table class="table align-middle mb-0 table-hover" id="tblLatest">
                 <thead class="table-dark">
                   <tr>
                     <th style="width:160px">Gesto</th>
                     <th>Último estado</th>
-                    <th style="width:180px">Fecha/Hora</th>
+                    <th style="width:200px">Fecha/Hora</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -105,58 +142,22 @@
               </table>
             </div>
           </div>
+
+          <!-- 🔴 LOG MOVIDO AQUÍ para liberar contadores -->
+          <div class="p-2 border-top">
+            <pre id="log" class="mb-0 small logbox"></pre>
+          </div>
+
           <div class="card-footer small text-muted">
             Se actualiza automáticamente cada 1 s.
           </div>
         </div>
-        <!-- ===== /Último estado (en vivo) ===== -->
-
-        <!-- ===== Contadores — EN MEDIO ===== -->
-        <div class="card shadow-sm mt-4">
-          <div class="card-header">Contadores</div>
-          <div class="card-body">
-            <div class="row text-center">
-              <div class="col-4"><div class="badge text-bg-dark fs-6 w-100 py-3"><div class="small">PARPADEOS</div><div id="blinkCount" class="fs-4">0</div></div></div>
-              <div class="col-4"><div class="badge text-bg-dark fs-6 w-100 py-3"><div class="small">CEJAS ↑</div><div id="browCount" class="fs-4">0</div></div></div>
-              <div class="col-4"><div class="badge text-bg-dark fs-6 w-100 py-3"><div class="small">BOCA ↑</div><div id="mouthCount" class="fs-4">0</div></div></div>
-            </div>
-            <hr>
-            <pre id="log" class="mb-0 small" style="max-height:200px; overflow:auto;"></pre>
-          </div>
-        </div>
-        <!-- ===== /Contadores ===== -->
-
-        <!-- ===== Controles rápidos — ABAJO ===== -->
-        <div class="card shadow-sm mt-4">
-          <div class="card-header">Controles rápidos</div>
-          <div class="card-body small">
-            <div class="mb-3">
-              <label class="form-label mb-1">Sensibilidad parpadeo</label>
-              <input id="sBlink" type="range" min="70" max="95" value="80" class="form-range">
-              <div class="text-muted">Cierre = EARbase × <span id="lblBlink">0.80</span> · Apertura = +0.10</div>
-            </div>
-            <div class="mb-3">
-              <label class="form-label mb-1">Sensibilidad cejas</label>
-              <input id="sBrow" type="range" min="110" max="150" value="130" class="form-range">
-              <div class="text-muted">Umbral = Base × <span id="lblBrow">1.30</span></div>
-            </div>
-            <div class="mb-3">
-              <label class="form-label mb-1">Sensibilidad boca</label>
-              <input id="sMouth" type="range" min="130" max="190" value="160" class="form-range">
-              <div class="text-muted">Umbral = Base × <span id="lblMouth">1.60</span></div>
-            </div>
-            <ul class="mb-0">
-              <li>Ejecuta en <strong>https</strong> o <strong>localhost</strong>.</li>
-              <li>Buena luz frontal evita falsos positivos.</li>
-            </ul>
-          </div>
-        </div>
-        <!-- ===== /Controles rápidos ===== -->
       </div>
     </div>
   </main>
 
-  <footer class="bg-dark text-light py-3">
+  <!-- FOOTER -->
+  <footer class="bg-dark text-light py-3 mt-5">
     <div class="container d-flex flex-wrap align-items-center justify-content-between">
       <span class="small">© 2025 | Programador: <strong>Daniel Rodriguez Del Valle</strong></span>
       <span class="small">HTML · Bootstrap · JavaScript · MediaPipe · OpenCV.js</span>
@@ -166,3 +167,4 @@
   <script defer src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+

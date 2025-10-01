@@ -1,42 +1,208 @@
-.view-wrap{
-  position: relative;
-  width: 100%;
-  max-width: 720px;
-  margin-inline: auto;
-  aspect-ratio: 4/3;      /* más compacto que 16:9 */
-  background: #000;
-  border-radius: .6rem;
-  overflow: hidden;
-}
-#video, #overlay{
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-#log{ background:#111; color:#c7f; border-radius:.5rem; padding:.75rem; }
-.badge.fs-6{ min-width:88px; }
-.status-thumb{
-  height: 36px;       /* tamaño pequeño */
-  width: auto;
-  display: block;
-  object-fit: contain;
-}
-.thumb-wrap{
-  min-height: 38px;   /* que no brinque la tabla cuando cambia */
-}
-/* Tabla “Último estado” */
-#tblLatest td .badge {
-  font-size: 0.95rem;
-  padding: 0.5rem 0.65rem;
-  letter-spacing: .3px;
-}
-#tblLatest tbody tr:hover {
-  background: rgba(0,0,0,0.03);
+/* =========================================================
+   Tema: Navy de fondo + Paneles azul claro (soft & llamativo)
+   Archivo: styles.css
+   ========================================================= */
+
+/* ----------- Paleta ----------- */
+:root{
+  --navy-900:#0b1020;
+  --navy-800:#0e1530;
+
+  --blue-10:#f0f7ff;
+  --blue-20:#e6f0ff;
+  --blue-30:#dbeafe;
+  --blue-40:#cfe2ff;
+  --blue-50:#bfd6ff;
+
+  --ink-900:#0f172a;
+  --ink-700:#334155;
+
+  --brand:#2563eb;
+  --brand-2:#60a5fa;
+  --cyan:#06b6d4;
+  --ok:#16a34a;
+  --warn:#f59e0b;
+  --danger:#ef4444;
+
+  --shadow: 0 10px 28px rgba(15,23,42,.24);
 }
 
-/* Indicador LIVE */
-#liveDot.text-bg-success {
-  box-shadow: 0 0 0 .25rem rgba(25,135,84,.15);
+/* ----------- Base ----------- */
+body{
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(37,99,235,.12), transparent 70%),
+    radial-gradient(900px 500px at 120% 10%, rgba(6,182,212,.14), transparent 60%),
+    linear-gradient(180deg, var(--navy-900), var(--navy-800));
+  color:#eaf1ff;
+}
+
+/* ----------- Navbar ----------- */
+.navbar{
+  background: linear-gradient(90deg, rgba(9,14,32,.95), rgba(9,14,32,.78));
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.navbar .navbar-brand{ color:#fff; }
+.navbar .nav-link{ color:#cfe3ff; }
+.navbar .nav-link:hover{ color:#fff; }
+.navbar .nav-link.active{ color:#fff; position:relative; }
+.navbar .nav-link.active::after{
+  content:""; position:absolute; left:10%; right:10%; bottom:-10px; height:3px;
+  background: linear-gradient(90deg, var(--brand), var(--cyan));
+  border-radius:2px;
+}
+
+/* ----------- Cards ----------- */
+.card{
+  background: var(--blue-10);
+  color: var(--ink-900);
+  border: 1px solid var(--blue-50);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+.card-header{
+  background: var(--blue-20) !important;
+  border-bottom: 1px solid var(--blue-50);
+  color: var(--ink-900);
+  font-weight: 700;
+}
+.card-footer{
+  background: var(--blue-20);
+  border-top: 1px solid var(--blue-50);
+  color: var(--ink-700);
+}
+
+/* ----------- Vista ----------- */
+.view-wrap{
+  position:relative; width:100%; min-height:360px; background:#000;
+  border-radius:14px; overflow:hidden; border:1px solid #0b1220;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.05);
+}
+#video,#overlay{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+
+/* ----------- Tablas ----------- */
+.table{ color: var(--ink-900); border-color: var(--blue-50); }
+.table thead{ background: var(--blue-20); color: var(--ink-900); }
+.table thead th{ font-weight: 800; border-bottom:1px solid var(--blue-50)!important; }
+.table > :not(caption) > * > *{
+  background-color: var(--blue-10);
+  border-bottom-color: var(--blue-50);
+}
+.table tbody tr:nth-child(even) > *{ background-color: var(--blue-30); }
+.table-hover tbody tr:hover > *{ background-color: var(--blue-40) !important; }
+.table-responsive{
+  border-radius: 12px; overflow: hidden; border: 1px solid var(--blue-50);
+}
+.small,.text-muted{ color: var(--ink-700)!important; }
+
+/* ----------- Selects/inputs ----------- */
+.form-select,.form-control{
+  color: var(--ink-900);
+  background: #fff;
+  border:1px solid var(--blue-50);
+  border-radius: 12px;
+}
+.form-select:focus,.form-control:focus{
+  border-color:#93c5fd; box-shadow:0 0 0 .2rem rgba(147,197,253,.35);
+}
+
+/* ----------- Sliders ----------- */
+.form-range::-webkit-slider-runnable-track{ background:#dbe4f6; }
+.form-range::-webkit-slider-thumb{
+  background: linear-gradient(180deg, var(--brand-2), var(--brand));
+  border:0;
+}
+
+/* ----------- Botones ----------- */
+.btn{ border-radius:12px; transition: transform .06s ease, filter .2s ease; }
+.btn:active{ transform: translateY(1px); }
+.btn-success{ background: linear-gradient(180deg, #22c55e, #16a34a); border:1px solid #16a34a; color:#fff; }
+.btn-outline-danger{ color:var(--danger); border-color:var(--danger); }
+.btn-outline-danger:hover{ background:rgba(239,68,68,.08); color:#b91c1c; }
+.btn-outline-primary{ color:var(--brand); border-color:var(--brand); }
+.btn-outline-primary:hover{ background:rgba(37,99,235,.08); color:#1d4ed8; }
+.btn-warning{ background: linear-gradient(180deg, #fde047, #f59e0b); border:1px solid #f59e0b; color:#111827; }
+
+/* ----------- Badges ----------- */
+.badge{ border-radius:999px; font-weight:700; }
+.badge.text-bg-success{ background:#16a34a !important; }
+.badge.text-bg-warning{ background:#f59e0b !important; color:#111827; }
+.badge.text-bg-danger { background:#ef4444 !important; }
+.badge.text-bg-info   { background:#3abff8 !important; color:#0b1220; }
+.badge.text-bg-secondary{ background:#64748b !important; }
+
+/* ----------- LIVE/OFF ----------- */
+#liveDot{ box-shadow:none; }
+
+/* ----------- Contadores (rojo) ----------- */
+#blinkCount,#browCount,#mouthCount{
+  font-size: 2.4rem;
+  font-weight: 800;
+  color: #ea0e0e;
+}
+.badge.text-bg-dark,
+.badge.text-bg-dark *{
+  background: linear-gradient(180deg, #ef4444, #b91c1c) !important;
+  color: #ed1313 !important;
+  border: 1px solid rgba(0,0,0,.08);
+  text-shadow: 0 1px 1px rgba(0,0,0,.25);
+}
+.badge.text-bg-dark .small{ opacity: .95; }
+
+/* ----------- Mini-iconos ----------- */
+.status-thumb{
+  width:60px; height:60px; object-fit:contain;
+  filter: drop-shadow(0 6px 12px rgba(0,0,0,.25));
+}
+
+/* ----------- Footer ----------- */
+footer{
+  border-top: 1px solid rgba(255,255,255,.08);
+  background: linear-gradient(180deg, rgba(9,14,32,.95), rgba(9,14,32,1)) !important;
+  color:#d9e7ff;
+}
+
+/* ----------- Separadores ----------- */
+hr{ border-color: var(--blue-50); }
+
+/* Letras negras en tabla de Último estado */
+#tblLatest th, 
+#tblLatest td, 
+#tblLatest span {
+  color: #111827 !important;
+  font-weight: 700 !important;
+}
+
+/* =========================================================
+   Ajustes de layout para que quepa todo sin scroll
+   ========================================================= */
+:root{
+  --nav-h:56px;
+  --foot-h:56px;
+}
+
+html,body{ height:100%; }
+
+/* quepa entre nav y footer */
+.main-fit{
+  min-height:calc(100dvh - var(--nav-h) - var(--foot-h));
+  height:calc(100dvh - var(--nav-h) - var(--foot-h));
+  overflow:hidden;
+}
+
+/* cámara un poco más corta para que entren los contadores */
+.cam-fit{ max-height:50vh; }
+
+/* “Último estado” sin scroll interno (deja que la página ajuste) */
+.card .table-responsive{ max-height:none; overflow:visible; }
+
+/* Log rojo, bien visible */
+.logbox { color:#ea0e0e; background:transparent; max-height:120px; overflow:auto; }
+
+/* Footer pegado abajo visible */
+.footer-fixed{ position:sticky; bottom:0; z-index:10; }
+
+/* Responsive: en pantallas chicas usamos scroll normal */
+@media(max-width:1199.98px){
+  .main-fit{ height:auto; min-height:auto; overflow:visible; }
 }

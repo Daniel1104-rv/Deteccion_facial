@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Últimos 5 estatus</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="bg-body">
+  <!-- NAV -->
+  <nav class="navbar navbar-dark navbar-expand bg-dark shadow-sm sticky-top">
+    <div class="container">
+      <a class="navbar-brand fw-semibold" href="index.html">MediaPipe + OpenCV.js</a>
+      <ul class="navbar-nav ms-3">
+        <li class="nav-item"><a class="nav-link" href="index.html">En vivo</a></li>
+        <li class="nav-item"><a class="nav-link active" href="ultimos5.html">Últimos 5 estatus</a></li>
+        <li class="nav-item"><a class="nav-link" href="resumen_fecha.html">Resumen por fecha</a></li>
+        <li class="nav-item"><a class="nav-link" href="controles.html">Controles rápidos</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main class="container py-4">
+    <div class="section-title">
+      <h5 class="m-0">Últimos 5 estatus</h5>
+      <p class="text-muted m-0">Historial más reciente por tipo de gesto.</p>
+    </div>
+
+    <div class="card card-elev shadow-sm">
+      <div class="card-header bg-white d-flex gap-2 align-items-center">
+        <div class="ms-auto d-flex gap-2">
+          <select id="selGesto" class="form-select form-select-sm w-auto">
+            <option value="ojos" selected>OJOS</option>
+            <option value="cejas">CEJAS</option>
+            <option value="boca">BOCA</option>
+          </select>
+          <button id="btnRefresh" class="btn btn-outline-primary btn-sm">Actualizar</button>
+        </div>
+      </div>
+
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th style="width:90px">ID</th>
+                <th style="width:160px">Estado</th>
+                <th>Fecha/Hora</th>
+              </tr>
+            </thead>
+            <tbody id="tbody">
+              <!-- filas por JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card-footer small text-muted">Fuente: <code>/ultimos5/&lt;gesto&gt;</code></div>
+    </div>
+  </main>
+
+  <footer class="bg-dark text-light py-3 mt-5">
+    <div class="container d-flex flex-wrap align-items-center justify-content-between">
+      <span class="small">© 2025 | Programador: <strong>Daniel Rodriguez Del Valle</strong></span>
+      <span class="small">HTML · Bootstrap · JavaScript</span>
+    </div>
+  </footer>
+
+  <script>
+    const API_BASE = "http://127.0.0.1:8010";
+    const tbody = document.getElementById('tbody');
+    const selGesto = document.getElementById('selGesto');
+    const btnRefresh = document.getElementById('btnRefresh');
+
+    function tr(r){
+      const d = new Date(r.fecha_hora);
+      return `<tr>
+        <td>${r.id}</td>
+        <td>${r.estado}</td>
+        <td>${isNaN(d)?'—':d.toLocaleString()}</td>
+      </tr>`;
+    }
+
+    async function load(){
+      const g = selGesto.value; // ojos|cejas|boca
+      const res = await fetch(`${API_BASE}/ultimos5/${g}`);
+      const data = await res.json(); // {gesto, ultimos5:[{id, estado, fecha_hora}]}
+      tbody.innerHTML = (data.ultimos5||[]).map(tr).join('') || `<tr><td colspan="3" class="text-center text-muted py-3">Sin datos</td></tr>`;
+    }
+
+    btnRefresh.addEventListener('click', load);
+    selGesto.addEventListener('change', load);
+    load();
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
+</body>
+</html>

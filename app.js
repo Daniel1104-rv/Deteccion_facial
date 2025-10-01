@@ -255,29 +255,26 @@ function onResults(r){
   if (calibrating){ calibSamples.push({ ear:earAvg, brow:browDist, mouth:mouthOpen }); return; }
 
   // ====== UMBRALES (con histéresis) ======
-  // OJOS: cierre y apertura con separación
   const kClose = sBlink ? (sBlink.value/100) : 0.80;
   const kOpen  = Math.min(kClose + 0.10, 0.97);
   const thClose= calib.earBase * kClose;
   const thOpen = calib.earBase * kOpen;
 
-  // CEJAS
   const kBrow  = sBrow ? (sBrow.value/100) : 1.30;
   const thBrow = calib.browBase * kBrow;
 
-  // BOCA
   const kMouth = sMouth ? (sMouth.value/100) : 1.60;
-  const thMouthOpen  = calib.mouthBase * kMouth; // abrir
-  const thMouthClose = thMouthOpen * 0.92;       // cerrar (histéresis)
+  const thMouthOpen  = calib.mouthBase * kMouth;
+  const thMouthClose = thMouthOpen * 0.92;
 
   const t = now();
 
-  // ====== OJOS (solo postear en parpadeo válido) ======
+  // ====== OJOS ======
   if (eyeState === 'OPEN' && earAvg < thClose) {
     if (t - eyeOpenedAt >= EYE_MIN_OPEN_MS) {
       eyeState = 'CLOSED';
       eyeClosedAt = t;
-      eyePendingClosedPost = true; // aún no posteamos; verificamos duración
+      eyePendingClosedPost = true;
     }
   } else if (eyeState === 'CLOSED' && earAvg > thOpen) {
     const dur = t - eyeClosedAt;
@@ -287,17 +284,17 @@ function onResults(r){
       if (eyePendingClosedPost) { saveOjos('CERRADO'); eyePendingClosedPost = false; }
       saveOjos('ABIERTO');
     } else {
-      eyePendingClosedPost = false; // amago
+      eyePendingClosedPost = false;
     }
     eyeState = 'OPEN'; eyeOpenedAt = t;
   }
 
-  // ====== CEJAS (solo postear cuando se valida y cuando baja) ======
+  // ====== CEJAS ======
   if (!browAbove && browDist > thBrow) {
     browAbove = true;
     browStartAt = t;
     browPeak = browDist;
-    browPendingUpPost = true; // post ARRIBA solo si sostiene
+    browPendingUpPost = true;
   }
   if (browAbove) {
     browPeak = Math.max(browPeak, browDist);
@@ -307,39 +304,35 @@ function onResults(r){
       browPendingUpPost = false;
     }
 
-    const dropped = browDist < thBrow * 0.92; // caída requerida
+    const dropped = browDist < thBrow * 0.92;
     const refractOK = (t - lastBrowAt) > BROW_REFRACT_MS;
 
     if (dropped) {
       if ((t - browStartAt) >= BROW_MIN_HOLD_MS && refractOK) {
         browCount++; browCountEl.textContent = String(browCount);
         lastBrowAt = t; log('Cejas ↑');
-        saveCejas('ABAJO');     // solo cuando el evento fue válido
+        saveCejas('ABAJO');
       }
-      // cerrar ciclo (válido o amago)
       browAbove = false; browPeak = 0; browPendingUpPost = false;
     }
   }
 
-  // ====== BOCA (solo postear cuando se valida y cuando cierra) ======
+  // ====== BOCA ======
   if (mouthState === 'CLOSED') {
     if (mouthOpen > thMouthOpen) {
       mouthState = 'OPEN';
       mouthOpenedAt = t;
       mouthClosedAt = 0;
-      mouthPendingOpenPost = true; // post ABIERTA solo si se valida
+      mouthPendingOpenPost = true;
     }
   } else {
-    // OPEN
     if (mouthOpen > thMouthOpen) {
       if (mouthPendingOpenPost && (t - mouthOpenedAt) >= MOUTH_OPEN_MIN_MS) {
-        saveBoca('ABIERTA');  // apertura válida confirmada
+        saveBoca('ABIERTA');
         mouthPendingOpenPost = false;
       }
     } else {
-      // empezó a cerrar
       if ((t - mouthOpenedAt) < MOUTH_OPEN_MIN_MS) {
-        // amago: cancelar, no postear nada
         mouthState = 'CLOSED';
         mouthPendingOpenPost = false;
         mouthClosedAt = 0;
@@ -351,7 +344,7 @@ function onResults(r){
           if (cierreOK && refractOK) {
             mouthCount++; mouthCountEl.textContent = String(mouthCount);
             lastMouthAt = t; log('Boca ↑');
-            saveBoca('CERRADA');   // solo cuando el evento es válido
+            saveBoca('CERRADA');
             mouthState = 'CLOSED';
             mouthClosedAt = 0;
             mouthPendingOpenPost = false;
@@ -439,7 +432,7 @@ btnStop.addEventListener('click', stopCamera);
 btnReset.addEventListener('click', () => resetCounters(true));
 window.addEventListener('beforeunload', stopCamera);
 
-// ====== [AGREGADO] Último estado (tabla en vivo con imagen) ======
+// ====== Último estado (tabla en vivo con imagen) ======
 const lastOjosState = document.getElementById('lastOjosState');
 const lastOjosTime  = document.getElementById('lastOjosTime');
 const lastCejasState= document.getElementById('lastCejasState');
@@ -454,20 +447,11 @@ const lastBocaImg   = document.getElementById('lastBocaImg');
 const btnRefreshLatest = document.getElementById('btnRefreshLatest');
 const liveDot = document.getElementById('liveDot');
 
-/* Mapa de imágenes/GIF (pon tus archivos en /assets o cambia las rutas) */
+/* Mapa de imágenes */
 const ICONS = {
-  OJOS: {
-    ABIERTO: "assets/ojos_abiertos.svg",
-    CERRADO: "assets/ojos_cerrados.svg",
-  },
-  CEJAS: {
-    ARRIBA:  "assets/cejas_arriba.svg",
-    ABAJO:   "assets/cejas_abajo.svg",
-  },
-  BOCA: {
-    ABIERTA: "assets/boca_abierta.svg",
-    CERRADA: "assets/boca_cerrada.svg",
-  }
+  OJOS: { ABIERTO: "assets/ojos_abiertos.svg", CERRADO: "assets/ojos_cerrados.svg" },
+  CEJAS:{ ARRIBA:  "assets/cejas_arriba.svg",  ABAJO:   "assets/cejas_abajo.svg"  },
+  BOCA: { ABIERTA: "assets/boca_abierta.svg",  CERRADA: "assets/boca_cerrada.svg" }
 };
 
 function badgeClassByGesto(gesto, estado) {
@@ -483,13 +467,9 @@ function putLatest(targetBadgeEl, targetTimeEl, targetImgEl, gesto, data) {
   const ultimo = data?.ultimo || null;
   const estado = ultimo?.estado || '—';
   const fh = ultimo?.fecha_hora || '—';
-
-  // Badge + fecha
   targetBadgeEl.textContent = estado;
   targetBadgeEl.className = 'badge ' + badgeClassByGesto(gesto, estado);
   targetTimeEl.textContent = ultimo ? formatDateTime(fh) : '—';
-
-  // Imagen según estado
   const src = ICONS?.[gesto]?.[estado];
   if (src) {
     targetImgEl.src = src;
@@ -499,8 +479,6 @@ function putLatest(targetBadgeEl, targetTimeEl, targetImgEl, gesto, data) {
     targetImgEl.removeAttribute('src');
   }
 }
-
-// Consulta los 3 endpoints en paralelo y actualiza la tabla
 async function refreshLatest() {
   try {
     liveDot.textContent = 'LIVE';
@@ -510,28 +488,103 @@ async function refreshLatest() {
       fetch(`${API_BASE}/ultimo/cejas`).then(r => r.json()),
       fetch(`${API_BASE}/ultimo/ojos`).then(r => r.json()),
     ]);
-
-    if (boca.status === 'fulfilled') {
-      putLatest(lastBocaState, lastBocaTime, lastBocaImg, 'BOCA', boca.value);
-    }
-    if (cejas.status === 'fulfilled') {
-      putLatest(lastCejasState, lastCejasTime, lastCejasImg, 'CEJAS', cejas.value);
-    }
-    if (ojos.status === 'fulfilled') {
-      putLatest(lastOjosState, lastOjosTime, lastOjosImg, 'OJOS', ojos.value);
-    }
+    if (boca.status === 'fulfilled') putLatest(lastBocaState, lastBocaTime, lastBocaImg, 'BOCA',  boca.value);
+    if (cejas.status === 'fulfilled') putLatest(lastCejasState, lastCejasTime, lastCejasImg, 'CEJAS', cejas.value);
+    if (ojos.status === 'fulfilled') putLatest(lastOjosState, lastOjosTime, lastOjosImg, 'OJOS',  ojos.value);
   } catch (e) {
     liveDot.textContent = 'OFF';
     liveDot.className = 'badge rounded-pill text-bg-secondary';
   }
 }
-
-// Botón manual
 if (btnRefreshLatest) btnRefreshLatest.addEventListener('click', refreshLatest);
-
-// Polling automático cada 1 s
 setInterval(refreshLatest, 1000);
-
-// Disparo inicial al cargar
 refreshLatest();
 
+// ====== NUEVO: Resumen de HOY ======
+const hoyParpadeos = document.getElementById('hoyParpadeos');
+const hoyBoca      = document.getElementById('hoyBoca');
+const hoyCejas     = document.getElementById('hoyCejas');
+const btnHoy       = document.getElementById('btnHoy');
+
+async function fetchResumenHoy(){
+  try{
+    const r = await fetch(`${API_BASE}/resumen/hoy`);
+    if(!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    const j = await r.json();
+    hoyParpadeos.textContent = j.parpadeos ?? 0;
+    hoyBoca.textContent      = j.boca_abierta ?? 0;
+    hoyCejas.textContent     = j.cejas_arriba ?? 0;
+  }catch(e){
+    hoyParpadeos.textContent = hoyBoca.textContent = hoyCejas.textContent = '—';
+    log('ERROR /resumen/hoy: ' + e.message);
+  }
+}
+btnHoy.addEventListener('click', fetchResumenHoy);
+fetchResumenHoy(); // carga inicial
+
+// ====== NUEVO: Resumen por FECHA ======
+const fechaResumen = document.getElementById('fechaResumen');
+const btnResumenFecha = document.getElementById('btnResumenFecha');
+const fechaParpadeos = document.getElementById('fechaParpadeos');
+const fechaBoca      = document.getElementById('fechaBoca');
+const fechaCejas     = document.getElementById('fechaCejas');
+
+btnResumenFecha.addEventListener('click', async () => {
+  const f = fechaResumen.value;
+  if(!f){ alert('Selecciona una fecha.'); return; }
+  try{
+    const r = await fetch(`${API_BASE}/resumen/fecha?fecha=${encodeURIComponent(f)}`);
+    if(!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    const j = await r.json();
+    fechaParpadeos.textContent = j.parpadeos ?? 0;
+    fechaBoca.textContent      = j.boca_abierta ?? 0;
+    fechaCejas.textContent     = j.cejas_arriba ?? 0;
+  }catch(e){
+    fechaParpadeos.textContent = fechaBoca.textContent = fechaCejas.textContent = '—';
+    log('ERROR /resumen/fecha: ' + e.message);
+  }
+});
+
+// ====== NUEVO: Últimos 5 por gesto ======
+const selUltimos5 = document.getElementById('selUltimos5');
+const btnUltimos5 = document.getElementById('btnUltimos5');
+const tbodyUltimos5 = document.getElementById('tbodyUltimos5');
+
+function renderUltimos5(rows){
+  tbodyUltimos5.innerHTML = '';
+  if(!rows || rows.length === 0){
+    tbodyUltimos5.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-3">Sin datos</td></tr>';
+    return;
+  }
+  for(const r of rows){
+    const tr = document.createElement('tr');
+    const tdId = document.createElement('td');
+    const tdEstado = document.createElement('td');
+    const tdFecha = document.createElement('td');
+    tdId.textContent = r.id ?? '—';
+    tdEstado.textContent = r.estado ?? '—';
+    tdFecha.textContent = r.fecha_hora ? new Date(r.fecha_hora).toLocaleString() : '—';
+    tr.appendChild(tdId); tr.appendChild(tdEstado); tr.appendChild(tdFecha);
+    tbodyUltimos5.appendChild(tr);
+  }
+}
+
+async function fetchUltimos5(gesto){
+  try{
+    const r = await fetch(`${API_BASE}/ultimos5/${gesto}`);
+    if(!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    const j = await r.json();
+    renderUltimos5(j.ultimos5 || []);
+  }catch(e){
+    renderUltimos5([]);
+    log('ERROR /ultimos5/'+gesto+': ' + e.message);
+  }
+}
+
+btnUltimos5.addEventListener('click', () => {
+  const g = selUltimos5.value; // "boca" | "cejas" | "ojos"
+  fetchUltimos5(g);
+});
+
+// carga inicial para "boca"
+fetchUltimos5('boca');
